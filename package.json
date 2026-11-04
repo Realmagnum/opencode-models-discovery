@@ -18,6 +18,9 @@
     "./tui": {
       "types": "./src/tui.ts",
       "default": "./dist/tui.js"
+    },
+    "./gui-experimental": {
+      "default": "./dist/gui-experimental.cjs"
     }
   },
   "files": [
@@ -32,11 +35,12 @@
     "test:watch": "vitest watch",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "compile": "npm run compile:runtime && npm run compile:root && npm run compile:server && npm run compile:tui",
+    "compile": "npm run compile:runtime && npm run compile:root && npm run compile:server && npm run compile:tui && npm run compile:gui",
     "compile:runtime": "esbuild src/runtime.ts --bundle --format=esm --platform=node --packages=external --target=node18 --sourcemap --keep-names --outfile=dist/runtime.js",
     "compile:root": "esbuild src/index.ts --format=esm --platform=node --packages=external --target=node18 --sourcemap --keep-names --outfile=dist/index.js",
     "compile:server": "esbuild src/server.ts --format=esm --platform=node --packages=external --target=node18 --sourcemap --keep-names --outfile=dist/server.js",
     "compile:tui": "esbuild src/tui.ts --bundle --format=esm --platform=node --packages=external --target=node18 --sourcemap --keep-names --outfile=dist/tui.js",
+    "compile:gui": "vite build",
     "build": "npm run lint && npm run typecheck && npm run test:run && npm run compile",
     "test:v1": "vitest run test/plugin.test.ts test/v1-v2-isolation.test.ts",
     "test:v2": "vitest run test/v2",
@@ -81,8 +85,11 @@
     "esbuild": "^0.28.2",
     "eslint": "^10.10.0",
     "globals": "^17.12.0",
+    "solid-js": "^1.9.15",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.70.0",
+    "vite": "^7.3.6",
+    "vite-plugin-solid": "^2.11.10",
     "vitest": "^5.0.0"
   }
 }
