@@ -470,7 +470,7 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
 }
 
 export default Plugin.define({
-  id: "opencode.models-discovery",
+  id: "opencode-models-discovery",
   setup: setupV2,
 })
 

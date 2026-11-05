@@ -4,7 +4,7 @@ import { setupV2 } from "../../src/v2/index.js"
 
 describe("DiscoveryRpcDefinition", () => {
   it("defines the required RPC methods with correct schemas", () => {
-    expect(DiscoveryRpcDefinition.id).toBe("opencode.models-discovery")
+    expect(DiscoveryRpcDefinition.id).toBe("opencode-models-discovery")
     expect(DiscoveryRpcDefinition.methods).toHaveProperty("refresh")
     expect(DiscoveryRpcDefinition.methods).toHaveProperty("cacheInspect")
     expect(DiscoveryRpcDefinition.methods).toHaveProperty("cacheClear")
@@ -72,7 +72,7 @@ describe("DiscoveryRpcDefinition", () => {
     await setupV2(ctx as any)
 
     expect(registerMock).toHaveBeenCalledTimes(1)
-    expect(registeredDefinition?.id).toBe("opencode.models-discovery")
+    expect(registeredDefinition?.id).toBe("opencode-models-discovery")
     expect(registeredHandlers).toBeDefined()
 
     // Test cacheInspect handler

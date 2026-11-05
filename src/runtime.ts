@@ -4,7 +4,7 @@ import { setupV2 } from './v2/index.js'
 
 export const combinedPlugin = {
   ...Plugin.define({
-    id: 'opencode.models-discovery',
+    id: 'opencode-models-discovery',
     setup: setupV2,
   }),
   server: ModelDiscoveryPlugin,

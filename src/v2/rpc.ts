@@ -95,7 +95,7 @@ export interface RpcOverrideDeleteOutput {
 }
 
 export const DiscoveryRpcDefinition = Rpc.define({
-  id: "opencode.models-discovery",
+  id: "opencode-models-discovery",
   methods: {
     status: {
       input: {

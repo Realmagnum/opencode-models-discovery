@@ -154,7 +154,7 @@ async function editModelOverride(
 }
 
 export default defineTuiPlugin({
-  id: "opencode.models-discovery",
+  id: "opencode-models-discovery",
   setup: async (context) => {
     const rpc = context.client.rpc(DiscoveryRpcDefinition)
     const getLocation = () => context.location ?? context.data?.location?.default()

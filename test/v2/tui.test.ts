@@ -271,7 +271,7 @@ describe("V2 TUI Plugin", () => {
     const { ctx, rpcClient, toastShow, getKeymapLayer } = createMockTuiContext()
     rpcClient.refresh.mockRejectedValueOnce({
       type: "rpc.unavailable",
-      message: "RPC is unavailable: opencode.models-discovery",
+      message: "RPC is unavailable: opencode-models-discovery",
     })
 
     await tuiPlugin.setup(ctx as never)
@@ -286,7 +286,7 @@ describe("V2 TUI Plugin", () => {
 
     expect(toastShow).toHaveBeenCalledWith({
       title: "Models Discovery",
-      message: "Refresh failed: RPC is unavailable: opencode.models-discovery",
+      message: "Refresh failed: RPC is unavailable: opencode-models-discovery",
       variant: "error",
     })
   })

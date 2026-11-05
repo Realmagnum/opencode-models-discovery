@@ -296,7 +296,7 @@ describe("V2 plugin entrypoint", () => {
     const ctx = context({
       rpc: {
         register: vi.fn().mockImplementation(async (definition, handlers) => {
-          if (definition.id === "opencode.models-discovery") Object.assign(rpcHandlers, handlers)
+          if (definition.id === "opencode-models-discovery") Object.assign(rpcHandlers, handlers)
         }),
       },
     })
@@ -329,7 +329,7 @@ describe("V2 plugin entrypoint", () => {
     const ctx = context({
       rpc: {
         register: vi.fn().mockImplementation(async (definition, handlers) => {
-          if (definition.id === "opencode.models-discovery") Object.assign(rpcHandlers, handlers)
+          if (definition.id === "opencode-models-discovery") Object.assign(rpcHandlers, handlers)
         }),
       },
     })
@@ -368,7 +368,7 @@ describe("V2 plugin entrypoint", () => {
       },
       rpc: {
         register: vi.fn().mockImplementation(async (definition, handlers) => {
-          if (definition.id === "opencode.models-discovery") Object.assign(rpcHandlers, handlers)
+          if (definition.id === "opencode-models-discovery") Object.assign(rpcHandlers, handlers)
         }),
       },
     })
@@ -411,7 +411,7 @@ describe("V2 plugin entrypoint", () => {
       },
       rpc: {
         register: vi.fn().mockImplementation(async (definition, handlers) => {
-          if (definition.id === "opencode.models-discovery") Object.assign(rpcHandlers, handlers)
+          if (definition.id === "opencode-models-discovery") Object.assign(rpcHandlers, handlers)
         }),
       },
     })
