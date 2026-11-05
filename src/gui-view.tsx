@@ -280,9 +280,25 @@ export function SettingsView(props: Props) {
       {/* Header */}
       <div style={{ display: "flex", "justify-content": "space-between", "align-items": "flex-start", "margin-bottom": "20px" }}>
         <div>
-          <h2 style={{ "font-size": "18px", "font-weight": "600", "margin-bottom": "4px", color: "var(--text-default, #eceff4)" }}>
-            OpenAI-Compatible Model Discovery
-          </h2>
+          <div style={{ display: "flex", "align-items": "center", gap: "8px", "margin-bottom": "4px" }}>
+            <h2 style={{ "font-size": "18px", "font-weight": "600", margin: "0", color: "var(--text-default, #eceff4)" }}>
+              OpenAI-Compatible Model Discovery
+            </h2>
+            <span
+              style={{
+                "font-size": "11px",
+                "font-weight": "500",
+                color: "#b392f0",
+                background: "rgba(157, 124, 216, 0.15)",
+                border: "1px solid rgba(157, 124, 216, 0.35)",
+                "border-radius": "10px",
+                padding: "1px 7px",
+                "line-height": "1.4",
+              }}
+            >
+              Plugin
+            </span>
+          </div>
           <p style={{ "font-size": "12.5px", color: "var(--text-subdued, #94a3b8)", margin: "0" }}>
             Dynamic model catalog sync for OpenAI-compatible providers, gateways, and local backends.
           </p>
