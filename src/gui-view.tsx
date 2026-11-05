@@ -1,8 +1,11 @@
 import { For, Show, createSignal, onMount } from "solid-js"
 import { DiscoveryRpcDefinition, type RpcModelOverride, type RpcStatusOutput } from "./v2/rpc.js"
+import { resolveTranslation, type TranslationParams } from "./i18n.js"
 
 interface Props {
   readonly client: any
+  readonly t?: (key: string, params?: TranslationParams) => string
+  readonly locale?: () => string | undefined
   readonly toast?: {
     show(options: { title: string; message: string; variant?: "info" | "success" | "warning" | "error" }): void
   }
@@ -87,6 +90,14 @@ const tagStyle: Record<string, string> = {
 }
 
 export function SettingsView(props: Props) {
+  const t = (key: string, params?: TranslationParams): string => {
+    if (props.t) {
+      const val = props.t(key, params)
+      if (val && val !== key) return val
+    }
+    return resolveTranslation(props.locale?.(), key, params)
+  }
+
   const [loading, setLoading] = createSignal(false)
   const [refreshing, setRefreshing] = createSignal(false)
   const [statusData, setStatusData] = createSignal<RpcStatusOutput | null>(null)
@@ -282,7 +293,7 @@ export function SettingsView(props: Props) {
         <div>
           <div style={{ display: "flex", "align-items": "center", gap: "8px", "margin-bottom": "4px" }}>
             <h2 style={{ "font-size": "18px", "font-weight": "600", margin: "0", color: "var(--text-default, #eceff4)" }}>
-              OpenAI-Compatible Model Discovery
+              {t("settings.header.title")}
             </h2>
             <span
               style={{
@@ -300,7 +311,7 @@ export function SettingsView(props: Props) {
             </span>
           </div>
           <p style={{ "font-size": "12.5px", color: "var(--text-subdued, #94a3b8)", margin: "0" }}>
-            Dynamic model catalog sync for OpenAI-compatible providers, gateways, and local backends.
+            {t("settings.header.desc")}
           </p>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
@@ -309,14 +320,14 @@ export function SettingsView(props: Props) {
             onClick={() => handleClearCache()}
             disabled={refreshing() || loading()}
           >
-            Clear Cache
+            {t("settings.action.clearCache")}
           </button>
           <button
             style={buttonPrimary}
             onClick={() => handleRefresh(true)}
             disabled={refreshing() || loading()}
           >
-            {refreshing() ? "Refreshing..." : "Force Refresh"}
+            {refreshing() ? t("settings.action.refreshing") : t("settings.action.refresh")}
           </button>
         </div>
       </div>
