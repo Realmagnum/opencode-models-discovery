@@ -17,6 +17,8 @@ export const I18N_EN = {
   "settings.action.reset": "Reset to Defaults",
   "settings.action.edit": "Edit",
   "settings.action.customized": "Customized",
+  "settings.action.expandAll": "Expand All",
+  "settings.action.collapseAll": "Collapse All",
 
   // Summary Metrics
   "settings.summary.totalModels": "Total Models",
@@ -74,6 +76,8 @@ export const I18N_RU: Record<I18nKey, string> = {
   "settings.action.reset": "Сбросить параметры",
   "settings.action.edit": "Изменить",
   "settings.action.customized": "Настроено",
+  "settings.action.expandAll": "Развернуть все",
+  "settings.action.collapseAll": "Свернуть все",
 
   // Summary Metrics
   "settings.summary.totalModels": "Всего моделей",
@@ -114,7 +118,7 @@ export const I18N_RU: Record<I18nKey, string> = {
   "gear.title": "Открыть настройки обнаружения моделей",
 }
 
-export const I18N_CATALOG: Record<string, Record<I18nKey, string>> = {
+export const I18N_CATALOG: { readonly en: Record<string, string>; [locale: string]: Record<string, string> } = {
   en: I18N_EN,
   "en-us": I18N_EN,
   "en-gb": I18N_EN,
@@ -131,11 +135,11 @@ export function resolveTranslation(
   const lang = norm.split("-")[0] || "en"
 
   const dict = I18N_CATALOG[norm] || I18N_CATALOG[lang] || I18N_EN
-  const template = dict[key as I18nKey] ?? I18N_EN[key as I18nKey] ?? key
+  const template = dict[key] ?? I18N_EN[key as I18nKey] ?? key
 
   if (!params) return template
 
-  return template.replace(/\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g, (_, p) => {
+  return template.replace(/\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g, (_: string, p: string) => {
     return params[p] !== undefined ? String(params[p]) : `{{${p}}}`
   })
 }

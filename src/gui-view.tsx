@@ -110,6 +110,34 @@ export function SettingsView(props: Props) {
     override?: RpcModelOverride
   } | null>(null)
 
+  // Accordion collapsed state: providerID -> boolean (true = expanded, default false = collapsed)
+  const [expandedProviders, setExpandedProviders] = createSignal<Record<string, boolean>>({})
+
+  const isProviderExpanded = (providerID: string) => {
+    // If user is searching, expand matching providers automatically
+    if (search().trim().length > 0) return true
+    return expandedProviders()[providerID] === true
+  }
+
+  const toggleProvider = (providerID: string) => {
+    setExpandedProviders((prev) => ({
+      ...prev,
+      [providerID]: !isProviderExpanded(providerID),
+    }))
+  }
+
+  const expandAll = () => {
+    const data = statusData()
+    if (!data) return
+    const next: Record<string, boolean> = {}
+    for (const p of data.providers) next[p.id] = true
+    setExpandedProviders(next)
+  }
+
+  const collapseAll = () => {
+    setExpandedProviders({})
+  }
+
   // Edit form state
   const [editName, setEditName] = createSignal("")
   const [editContext, setEditContext] = createSignal<string>("")
@@ -393,99 +421,156 @@ export function SettingsView(props: Props) {
             {(p) => <option value={p.id}>{p.name} ({p.modelCount})</option>}
           </For>
         </select>
+        <div style={{ display: "flex", gap: "6px" }}>
+          <button
+            style={{ ...buttonSecondary, "font-size": "11.5px", padding: "6px 10px" }}
+            onClick={expandAll}
+          >
+            {t("settings.action.expandAll")}
+          </button>
+          <button
+            style={{ ...buttonSecondary, "font-size": "11.5px", padding: "6px 10px" }}
+            onClick={collapseAll}
+          >
+            {t("settings.action.collapseAll")}
+          </button>
+        </div>
       </div>
 
       {/* Provider & Model Lists */}
       <For each={filteredProviders()}>
-        {(provider) => (
-          <div style={cardStyle}>
-            {/* Provider Header */}
-            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "border-bottom": "1px solid rgba(255, 255, 255, 0.06)", "padding-bottom": "8px" }}>
-              <div style={{ display: "flex", "align-items": "center", gap: "8px" }}>
-                <span style={{ "font-size": "14px", "font-weight": "600", color: "var(--text-default, #eceff4)" }}>
-                  {provider.name}
-                </span>
-                <code style={{ "font-size": "11px", color: "var(--text-subdued, #94a3b8)", background: "rgba(255, 255, 255, 0.05)", padding: "1px 5px", "border-radius": "4px" }}>
-                  {provider.id}
-                </code>
-                <span style={badgeStyle(true)}>
-                  {provider.models.length} models
-                </span>
-              </div>
-              <button
-                style={{ ...buttonSecondary, "font-size": "11px", padding: "3px 8px" }}
-                onClick={() => handleClearCache(provider.id)}
+        {(provider) => {
+          const expanded = () => isProviderExpanded(provider.id)
+          return (
+            <div style={cardStyle}>
+              {/* Provider Header / Accordion Trigger */}
+              <div
+                style={{
+                  display: "flex",
+                  "justify-content": "space-between",
+                  "align-items": "center",
+                  cursor: "pointer",
+                  "user-select": "none",
+                  padding: "4px 0",
+                  ...(expanded() ? { "border-bottom": "1px solid rgba(255, 255, 255, 0.06)", "padding-bottom": "10px" } : {}),
+                }}
+                onClick={() => toggleProvider(provider.id)}
               >
-                Clear Provider Cache
-              </button>
-            </div>
-
-            {/* Model Items */}
-            <div style={{ display: "flex", "flex-direction": "column", gap: "6px" }}>
-              <For each={provider.models}>
-                {(model) => (
-                  <div
+                <div style={{ display: "flex", "align-items": "center", gap: "10px" }}>
+                  <span
                     style={{
-                      display: "flex",
-                      "justify-content": "space-between",
+                      display: "inline-flex",
                       "align-items": "center",
-                      padding: "8px 10px",
-                      background: "rgba(255, 255, 255, 0.02)",
-                      border: "1px solid rgba(255, 255, 255, 0.05)",
-                      "border-radius": "6px",
+                      "justify-content": "center",
+                      width: "20px",
+                      height: "20px",
+                      color: "var(--text-subdued, #94a3b8)",
+                      transform: expanded() ? "rotate(90deg)" : "rotate(0deg)",
+                      transition: "transform 0.15s ease",
+                      "flex-shrink": 0,
                     }}
                   >
-                    <div style={{ display: "flex", "flex-direction": "column", gap: "3px" }}>
-                      <div style={{ display: "flex", "align-items": "center", gap: "6px" }}>
-                        <span style={{ "font-weight": "500", color: "var(--text-default, #eceff4)" }}>
-                          {model.name}
-                        </span>
-                        <Show when={model.override}>
-                          <span style={{ "font-size": "10px", color: "#facc15", background: "rgba(250, 204, 21, 0.15)", padding: "1px 4px", "border-radius": "3px" }}>
-                            Customized
-                          </span>
-                        </Show>
-                      </div>
-                      <div style={{ display: "flex", "align-items": "center", gap: "4px" }}>
-                        <code style={{ "font-size": "11px", color: "var(--text-subdued, #94a3b8)" }}>
-                          {model.id}
-                        </code>
-                      </div>
-                      <div style={{ "margin-top": "2px" }}>
-                        <Show when={model.defaultValues?.limit?.context}>
-                          <span style={tagStyle}>ctx: {model.defaultValues?.limit?.context.toLocaleString()}</span>
-                        </Show>
-                        <Show when={model.defaultValues?.capabilities?.tools}>
-                          <span style={tagStyle}>tools</span>
-                        </Show>
-                        <Show when={model.defaultValues?.reasoning}>
-                          <span style={tagStyle}>thinking</span>
-                        </Show>
-                      </div>
-                    </div>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M6 3.5a.75.75 0 0 1 1.28-.53l5 5a.75.75 0 0 1 0 1.06l-5 5A.75.75 0 0 1 6 13.5V3.5z" />
+                    </svg>
+                  </span>
+                  <span style={{ "font-size": "14px", "font-weight": "600", color: "var(--text-default, #eceff4)" }}>
+                    {provider.name}
+                  </span>
+                  <code style={{ "font-size": "11px", color: "var(--text-subdued, #94a3b8)", background: "rgba(255, 255, 255, 0.05)", padding: "1px 5px", "border-radius": "4px" }}>
+                    {provider.id}
+                  </code>
+                  <span style={badgeStyle(true)}>
+                    {provider.models.length} models
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "6px", "align-items": "center" }}>
+                  <button
+                    style={{ ...buttonSecondary, "font-size": "11px", padding: "3px 8px" }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleClearCache(provider.id)
+                    }}
+                  >
+                    Clear Provider Cache
+                  </button>
+                </div>
+              </div>
 
-                    <div style={{ display: "flex", gap: "6px", "align-items": "center" }}>
-                      <button
-                        style={buttonSecondary}
-                        onClick={() => openEditModal(provider.id, model)}
-                      >
-                        Customize
-                      </button>
-                      <Show when={model.override}>
-                        <button
-                          style={buttonDanger}
-                          onClick={() => handleDeleteOverride(provider.id, model.id)}
-                        >
-                          Reset
-                        </button>
-                      </Show>
+              {/* Model Items (Collapsible) */}
+              <Show when={expanded()}>
+                <div style={{ display: "flex", "flex-direction": "column", gap: "6px" }}>
+                  <Show when={provider.models.length === 0}>
+                    <div style={{ padding: "12px", color: "var(--text-subdued, #8a8a8a)", "text-align": "center", "font-size": "12px" }}>
+                      {t("settings.provider.noModels")}
                     </div>
-                  </div>
-                )}
-              </For>
+                  </Show>
+                  <For each={provider.models}>
+                    {(model) => (
+                      <div
+                        style={{
+                          display: "flex",
+                          "justify-content": "space-between",
+                          "align-items": "center",
+                          padding: "8px 10px",
+                          background: "rgba(255, 255, 255, 0.02)",
+                          border: "1px solid rgba(255, 255, 255, 0.05)",
+                          "border-radius": "6px",
+                        }}
+                      >
+                        <div style={{ display: "flex", "flex-direction": "column", gap: "3px" }}>
+                          <div style={{ display: "flex", "align-items": "center", gap: "6px" }}>
+                            <span style={{ "font-weight": "500", color: "var(--text-default, #eceff4)" }}>
+                              {model.name}
+                            </span>
+                            <Show when={model.override}>
+                              <span style={{ "font-size": "10px", color: "#facc15", background: "rgba(250, 204, 21, 0.15)", padding: "1px 4px", "border-radius": "3px" }}>
+                                Customized
+                              </span>
+                            </Show>
+                          </div>
+                          <div style={{ display: "flex", "align-items": "center", gap: "4px" }}>
+                            <code style={{ "font-size": "11px", color: "var(--text-subdued, #94a3b8)" }}>
+                              {model.id}
+                            </code>
+                          </div>
+                          <div style={{ "margin-top": "2px" }}>
+                            <Show when={model.defaultValues?.limit?.context}>
+                              <span style={tagStyle}>ctx: {model.defaultValues?.limit?.context.toLocaleString()}</span>
+                            </Show>
+                            <Show when={model.defaultValues?.capabilities?.tools}>
+                              <span style={tagStyle}>tools</span>
+                            </Show>
+                            <Show when={model.defaultValues?.reasoning}>
+                              <span style={tagStyle}>thinking</span>
+                            </Show>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "6px", "align-items": "center" }}>
+                          <button
+                            style={buttonSecondary}
+                            onClick={() => openEditModal(provider.id, model)}
+                          >
+                            Customize
+                          </button>
+                          <Show when={model.override}>
+                            <button
+                              style={buttonDanger}
+                              onClick={() => handleDeleteOverride(provider.id, model.id)}
+                            >
+                              Reset
+                            </button>
+                          </Show>
+                        </div>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </Show>
             </div>
-          </div>
-        )}
+          )
+        }}
       </For>
 
       {/* Edit Override Modal Dialog */}

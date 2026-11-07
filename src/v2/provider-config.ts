@@ -75,7 +75,7 @@ export function parseProviderDiscoveryOptions(raw: unknown): ProviderDiscoveryOp
   const endpoint = typeof value.endpoint === "string" && value.endpoint.startsWith("/") ? value.endpoint : "/v1/models"
   const timeoutMs = typeof value.timeoutMs === "number" && Number.isFinite(value.timeoutMs) && value.timeoutMs > 0
     ? Math.max(1_000, Math.floor(value.timeoutMs))
-    : 5_000
+    : 15_000
 
   const modelInfoFormat = isModelInfoFormat(value.modelInfoFormat) ? value.modelInfoFormat : undefined
   const modelInfoEndpoint = typeof value.modelInfoEndpoint === "string" && value.modelInfoEndpoint.trim().length > 0

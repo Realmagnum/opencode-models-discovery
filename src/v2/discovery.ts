@@ -7,6 +7,7 @@ import { isDiscoveredRawModel } from "../core/model-types.js"
 import { prepareModelEnricher, type ModelEnrichmentResult, type ModelEnricher } from "../core/model-enrichment.js"
 import { createDiscoveryCacheEntry, discoveryCacheKey, readDiscoveryCache, writeDiscoveryCache, type DiscoveryCacheBackend, type DiscoveryCacheEntry } from "../core/discovery-cache.js"
 import { resolveModelInfoEnricher } from "../core/enricher-resolver.js"
+import { buildDiscoveryURL } from "../core/model-info-url.js"
 
 export interface DiscoveryLogger {
   warn(message: string, context?: Record<string, unknown>): void
@@ -86,7 +87,7 @@ export async function discoverInventory(
       ? provider.apiKey.trim()
       : (typeof provider.settings.apiKey === "string" && provider.settings.apiKey.trim().length > 0 ? provider.settings.apiKey.trim() : undefined)
 
-    const url = new URL(config.endpoint, new URL(baseURL).origin).toString()
+    const url = buildDiscoveryURL(baseURL, config.endpoint)
     const headers = new Headers({ accept: "application/json" })
     if (resolvedApiKey) headers.set("authorization", `Bearer ${resolvedApiKey}`)
 

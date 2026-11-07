@@ -1,8 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
 import { resolveModelInfoEnricher, buildModelInfoURL } from '../../src/core/enricher-resolver'
+import { buildDiscoveryURL } from '../../src/core/model-info-url'
 import { ModelInfoFormat } from '../../src/types/plugin-config'
 
 describe('shared enricher resolver', () => {
+  it('builds discovery URLs with sub-paths and default /v1/models correctly', () => {
+    expect(buildDiscoveryURL('https://spiderssense.com/v1/free', '/v1/models'))
+      .toBe('https://spiderssense.com/v1/free/models')
+    expect(buildDiscoveryURL('https://api.example.com/v1', '/v1/models'))
+      .toBe('https://api.example.com/v1/models')
+    expect(buildDiscoveryURL('https://api.example.com/v1', '/models'))
+      .toBe('https://api.example.com/models')
+    expect(buildDiscoveryURL('https://api.example.com/v1/free', '/custom/path'))
+      .toBe('https://api.example.com/custom/path')
+  })
+
   it('builds absolute and relative model-info URLs correctly', () => {
     expect(buildModelInfoURL('http://127.0.0.1:8000/v1', '/v1/model/info'))
       .toBe('http://127.0.0.1:8000/v1/model/info')
