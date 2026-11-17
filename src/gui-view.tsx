@@ -211,10 +211,16 @@ export function SettingsView(props: Props) {
   }
 
   const discoverServers = async () => {
-    const results = await Promise.all(props.servers.list().map(async (id) => {
+    // The app's own server is addressed as "sidecar" and is not always part of
+    // servers.list(), so probe it explicitly with the window's own client.
+    const ids = [...new Set(["sidecar", ...props.servers.list()])]
+    const results = await Promise.all(ids.map(async (id) => {
       const server = props.servers.get(id)
-      if (!server || !server.connected || !server.compatible) return null
-      const rpc = server.client?.rpc ? server.client.rpc(DiscoveryRpcDefinition) : null
+      const isSidecar = id === "sidecar"
+      const client = server?.client ?? (isSidecar ? props.client() : undefined)
+      if (!client) return null
+      if (server && (!server.connected || !server.compatible)) return null
+      const rpc = client.rpc ? client.rpc(DiscoveryRpcDefinition) : null
       if (!rpc) return null
       try {
         await rpc.status({})
@@ -232,14 +238,15 @@ export function SettingsView(props: Props) {
       }
       let install: ServerInstall = { type: "unknown" }
       try {
-        const listed = await server.client.plugin.list()
+        const listed = await client.plugin.list()
         const entries = Array.isArray(listed) ? listed : listed?.data ?? []
         const info = entries.find(isThisPlugin)
         if (info) install = pluginInstall(info)
       } catch {
         // Plugin inventory is unavailable; fall back to the capability probe.
       }
-      return { id, name: server.name, canToggle, install }
+      const name = server?.name ?? (isSidecar ? t("settings.servers.thisMachine") : id)
+      return { id, name, canToggle, install }
     }))
     setAvailableServers(results.filter((entry): entry is ServerEntry => entry !== null))
     setServersChecked(true)

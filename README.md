@@ -96,6 +96,20 @@ Remove local copies first: a directory under `~/.config/opencode/plugins/opencod
 automatically and would load twice. Keep local directories only for development, and point `plugins` at the checkout
 instead.
 
+When the checkout's `package.json` uses a scoped name such as `@realmagnum/opencode-models-discovery`, a bare path
+entry is skipped by the plugin loader. Configure the local directory with the object form so it loads:
+
+```jsonc
+{
+  "plugins": [
+    {
+      "package": "/absolute/path/to/opencode-models-discovery",
+      "options": {},
+    },
+  ],
+}
+```
+
 ```sh
 opencode plugin update @realmagnum/opencode-models-discovery
 opencode service restart

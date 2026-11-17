@@ -11,6 +11,7 @@ export const I18N_EN = {
   // Servers
   "settings.server": "Server",
   "settings.servers.refresh": "Find servers",
+  "settings.servers.thisMachine": "This machine",
   "settings.servers.switchUnsupported": "Provider switches need a newer opencode-models-discovery build on this server.",
   "settings.servers.localHint": "Installed from a local directory ({{path}}); update it on that machine.",
   "settings.servers.update": "Update plugin",
@@ -94,6 +95,7 @@ export const I18N_RU: Record<I18nKey, string> = {
   // Servers
   "settings.server": "Сервер",
   "settings.servers.refresh": "Найти серверы",
+  "settings.servers.thisMachine": "Этот компьютер",
   "settings.servers.switchUnsupported": "Для переключения провайдеров нужна более новая сборка opencode-models-discovery на этом сервере.",
   "settings.servers.localHint": "Установлен из локального каталога ({{path}}); обновите его на той машине.",
   "settings.servers.update": "Обновить плагин",
