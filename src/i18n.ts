@@ -43,8 +43,8 @@ export const I18N_EN = {
 
   // Providers & Models
   "settings.provider.noModels": "No matching models found.",
-  "settings.provider.switchOnly": "switch only",
-  "settings.provider.switchOnlyHint": "OpenCode manages this provider's catalog; the switch controls whether its models appear in the model picker.",
+  "settings.provider.switchOnly": "OpenCode catalog",
+  "settings.provider.switchOnlyHint": "OpenCode supplies this provider's models. The switch hides all of them from the model picker.",
   "settings.provider.disabled": "disabled",
   "settings.provider.toggle": "Provider availability",
   "settings.provider.enableHint": "Enable this provider and its models",
@@ -75,7 +75,7 @@ export const I18N_EN = {
   "toast.overrideReset": "Reset overrides for {{model}}",
   "toast.providerSwitchTitle": "Provider Switch",
   "toast.providerEnabled": "{{provider}} is available again.",
-  "toast.providerDisabled": "{{provider}} is disabled; its configuration is kept.",
+  "toast.providerDisabled": "{{provider}} is hidden from the model picker. Reload the window if the picker still lists it.",
   "toast.providerSwitchFailed": "Failed to change provider availability",
   "toast.providerSwitchUnsupported": "This server runs an older plugin build; update opencode-models-discovery there.",
   "toast.pluginUpdated": "opencode-models-discovery was updated on {{server}}.",
@@ -129,8 +129,8 @@ export const I18N_RU: Record<I18nKey, string> = {
 
   // Providers & Models
   "settings.provider.noModels": "Подходящие модели не найдены.",
-  "settings.provider.switchOnly": "только переключатель",
-  "settings.provider.switchOnlyHint": "Каталогом этого провайдера управляет OpenCode; переключатель определяет, показывать ли его модели в выборе моделей.",
+  "settings.provider.switchOnly": "каталог OpenCode",
+  "settings.provider.switchOnlyHint": "Модели этого провайдера поставляет сам OpenCode. Переключатель скрывает их все из выбора моделей.",
   "settings.provider.disabled": "выключен",
   "settings.provider.toggle": "Доступность провайдера",
   "settings.provider.enableHint": "Включить провайдера и его модели",
@@ -161,7 +161,7 @@ export const I18N_RU: Record<I18nKey, string> = {
   "toast.overrideReset": "Сброшены параметры для {{model}}",
   "toast.providerSwitchTitle": "Провайдер",
   "toast.providerEnabled": "{{provider}} снова доступен.",
-  "toast.providerDisabled": "{{provider}} выключен; настройки сохранены.",
+  "toast.providerDisabled": "{{provider}} скрыт из выбора моделей. Обновите окно, если список ещё показывает его.",
   "toast.providerSwitchFailed": "Не удалось изменить доступность провайдера",
   "toast.providerSwitchUnsupported": "На этом сервере старая сборка плагина; обновите opencode-models-discovery.",
   "toast.pluginUpdated": "opencode-models-discovery обновлён на сервере {{server}}.",
