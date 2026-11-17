@@ -58,6 +58,40 @@ function providerList(value: unknown): ListedProvider[] {
   })
 }
 
+interface RegistryProvider {
+  readonly id: string
+  readonly name?: string
+  readonly modelCount: number
+}
+
+/**
+ * Every provider the host knows about, including providers without discovery
+ * settings, so the settings page can switch any of them like OpenCode's own
+ * model list does.
+ */
+function providerRecords(value: unknown): RegistryProvider[] {
+  const entries = Array.isArray(value)
+    ? value
+    : value && typeof value === "object" && Array.isArray((value as { data?: unknown }).data)
+      ? (value as { data: unknown[] }).data
+      : []
+  return entries.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return []
+    const record = entry as { provider?: unknown; models?: unknown }
+    const provider = record.provider && typeof record.provider === "object" ? record.provider : entry
+    const id = (provider as ListedProvider).id
+    if (typeof id !== "string") return []
+    const models = record.models
+    const modelCount = models instanceof Map
+      ? models.size
+      : Array.isArray(models)
+        ? models.length
+        : 0
+    const name = (provider as ListedProvider).name
+    return [{ id, name: typeof name === "string" ? name : undefined, modelCount }]
+  })
+}
+
 async function configuredProviders(ctx: Plugin.Context): Promise<{
   providers: ConfiguredProvider[]
   discovery: Map<string, ProviderDiscoveryOptions>
@@ -134,13 +168,39 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
     if (modelDomain && typeof modelDomain.reload === "function") await modelDomain.reload()
   }
 
-  const providerStates = (): RpcProviderState[] => {
+  const providerStates = async (): Promise<RpcProviderState[]> => {
     const inventory = controller.getInventory()
-    return providers.map((provider) => ({
+    const listInput = ctx.location ? { location: ctx.location } : undefined
+    let registry: RegistryProvider[] = []
+    try {
+      registry = providerRecords(await ctx.provider.list(listInput as never))
+    } catch {
+      registry = []
+    }
+    // The provider route omits models, so counts come from the model registry.
+    const modelCounts = new Map<string, number>()
+    try {
+      const listed = await ctx.model.list()
+      const models = Array.isArray(listed) ? listed : listed?.data ?? []
+      for (const model of models) {
+        modelCounts.set(model.providerID, (modelCounts.get(model.providerID) ?? 0) + 1)
+      }
+    } catch {
+      // Older hosts without a model registry keep the inventory counts.
+    }
+    // Fall back to the discovery inventory when the host registry is unreadable.
+    const source: RegistryProvider[] = registry.length > 0
+      ? registry
+      : providers.map((provider) => ({
+          id: provider.id,
+          name: provider.name,
+          modelCount: inventory.get(provider.id)?.size ?? 0,
+        }))
+    return source.map((provider) => ({
       id: provider.id,
       name: provider.name ?? provider.id,
       enabled: isProviderEnabled(disabledProviders, provider.id),
-      modelCount: inventory.get(provider.id)?.size ?? 0,
+      modelCount: modelCounts.get(provider.id) ?? inventory.get(provider.id)?.size ?? provider.modelCount,
     }))
   }
 
@@ -480,12 +540,13 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
       },
       providerList: async () => {
         await syncConfiguredProviders()
-        return { providers: providerStates() }
+        return { providers: await providerStates() }
       },
       providerSetEnabled: async (rawInput) => {
         const input = rawInput as { readonly providerID: string; readonly enabled: boolean }
         await syncConfiguredProviders()
-        if (!providers.some((provider) => provider.id === input.providerID)) {
+        const known = (await providerStates()).some((provider) => provider.id === input.providerID)
+        if (!known) {
           throw new Error(`Unknown provider: ${input.providerID}`)
         }
         if (input.enabled) disabledProviders.delete(input.providerID)
@@ -499,7 +560,7 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
           throw error
         }
         await reloadModels()
-        return { providers: providerStates() }
+        return { providers: await providerStates() }
       },
     })
   }

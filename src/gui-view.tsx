@@ -1,5 +1,5 @@
 import { For, Show, createEffect, createSignal, onMount } from "solid-js"
-import { DiscoveryRpcDefinition, type RpcModelOverride, type RpcStatusOutput } from "./v2/rpc.js"
+import { DiscoveryRpcDefinition, type RpcModelOverride, type RpcProviderState, type RpcStatusOutput } from "./v2/rpc.js"
 import { resolveTranslation, type TranslationParams } from "./i18n.js"
 
 interface Props {
@@ -44,6 +44,15 @@ interface ServerEntry {
   readonly name: string
   readonly canToggle: boolean
   readonly install: ServerInstall
+}
+
+interface ProviderRow {
+  readonly id: string
+  readonly name: string
+  readonly enabled: boolean
+  readonly discovered: boolean
+  readonly modelCount: number
+  readonly models: RpcStatusOutput["providers"][number]["models"]
 }
 
 function pluginInstall(info: any): ServerInstall {
@@ -186,6 +195,7 @@ export function SettingsView(props: Props) {
   let statusRequest = 0
   const [refreshing, setRefreshing] = createSignal(false)
   const [statusData, setStatusData] = createSignal<RpcStatusOutput | null>(null)
+  const [providerStates, setProviderStates] = createSignal<RpcProviderState[]>([])
   const [search, setSearch] = createSignal("")
   const [selectedProvider, setSelectedProvider] = createSignal<string>("all")
   const [editingModel, setEditingModel] = createSignal<{
@@ -342,8 +352,15 @@ export function SettingsView(props: Props) {
     if (!client) return
     setLoading(true)
     try {
-      const data = await client.status({ details: true, rawCache: true })
-      if (request === statusRequest) setStatusData(data)
+      const [data, states] = await Promise.all([
+        client.status({ details: true, rawCache: true }),
+        typeof client.providerList === "function"
+          ? client.providerList({}).then((result: { providers: RpcProviderState[] }) => result.providers).catch(() => [])
+          : Promise.resolve([]),
+      ])
+      if (request !== statusRequest) return
+      setStatusData(data)
+      setProviderStates(states as RpcProviderState[])
     } catch (e: any) {
       if (request === statusRequest) props.toast?.show({
         title: "Model Discovery",
@@ -513,20 +530,53 @@ export function SettingsView(props: Props) {
     void fetchStatus()
   })
 
+  const providerRows = (): ProviderRow[] => {
+    const detail = new Map((statusData()?.providers ?? []).map((provider) => [provider.id, provider]))
+    const rows: ProviderRow[] = []
+    const seen = new Set<string>()
+    for (const state of providerStates()) {
+      const discovered = detail.get(state.id)
+      rows.push({
+        id: state.id,
+        name: state.name,
+        enabled: state.enabled,
+        discovered: Boolean(discovered),
+        modelCount: discovered?.modelCount ?? state.modelCount,
+        models: discovered?.models ?? [],
+      })
+      seen.add(state.id)
+    }
+    for (const provider of detail.values()) {
+      if (seen.has(provider.id)) continue
+      rows.push({
+        id: provider.id,
+        name: provider.name,
+        enabled: provider.enabled !== false,
+        discovered: true,
+        modelCount: provider.modelCount,
+        models: provider.models,
+      })
+    }
+    return rows.sort((a, b) => a.name.localeCompare(b.name))
+  }
+
   const filteredProviders = () => {
-    const data = statusData()
-    if (!data) return []
     const provFilter = selectedProvider()
     const q = search().toLowerCase().trim()
 
-    return data.providers
-      .filter((p) => provFilter === "all" || p.id === provFilter)
-      .map((p) => {
-        if (!q) return p
-        const matchedModels = p.models.filter(
-          (m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)
+    return providerRows()
+      .filter((provider) => provFilter === "all" || provider.id === provFilter)
+      .filter((provider) => {
+        if (!q) return true
+        if (provider.id.toLowerCase().includes(q) || provider.name.toLowerCase().includes(q)) return true
+        return provider.models.some((model) => model.id.toLowerCase().includes(q) || model.name.toLowerCase().includes(q))
+      })
+      .map((provider) => {
+        if (!q) return provider
+        const matchedModels = provider.models.filter(
+          (model) => model.id.toLowerCase().includes(q) || model.name.toLowerCase().includes(q)
         )
-        return { ...p, models: matchedModels }
+        return { ...provider, models: matchedModels }
       })
   }
 
@@ -641,7 +691,10 @@ export function SettingsView(props: Props) {
             </span>{" "}
             across{" "}
             <span style={{ color: "var(--text-default, #eceff4)", "font-weight": "600" }}>
-              {statusData()?.providers.length ?? 0} providers
+              {statusData()?.providers.length ?? 0} discovery providers
+            </span>{" "}
+            <span style={{ color: "var(--text-subdued, #94a3b8)" }}>
+              · {providerRows().length} in model picker
             </span>
           </div>
           <button
@@ -686,7 +739,7 @@ export function SettingsView(props: Props) {
           }}
         >
           <option value="all">All Providers</option>
-          <For each={statusData()?.providers ?? []}>
+          <For each={providerRows()}>
             {(p) => <option value={p.id}>{p.name} ({p.modelCount})</option>}
           </For>
         </select>
@@ -752,7 +805,9 @@ export function SettingsView(props: Props) {
                     {provider.id}
                   </code>
                   <span style={badgeStyle(enabled())}>
-                    {enabled() ? `${provider.models.length} models` : t("settings.provider.disabled")}
+                    {enabled()
+                      ? `${provider.modelCount} models${provider.discovered ? "" : ` · ${t("settings.provider.switchOnly")}`}`
+                      : t("settings.provider.disabled")}
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
@@ -813,7 +868,12 @@ export function SettingsView(props: Props) {
               {/* Model Items (Collapsible) */}
               <Show when={expanded()}>
                 <div style={{ display: "flex", "flex-direction": "column", gap: "6px" }}>
-                  <Show when={provider.models.length === 0}>
+                  <Show when={!provider.discovered}>
+                    <div style={{ padding: "12px", color: "var(--text-subdued, #8a8a8a)", "text-align": "center", "font-size": "12px" }}>
+                      {t("settings.provider.switchOnlyHint")}
+                    </div>
+                  </Show>
+                  <Show when={provider.discovered && provider.models.length === 0}>
                     <div style={{ padding: "12px", color: "var(--text-subdued, #8a8a8a)", "text-align": "center", "font-size": "12px" }}>
                       {t("settings.provider.noModels")}
                     </div>

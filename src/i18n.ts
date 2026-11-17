@@ -43,6 +43,8 @@ export const I18N_EN = {
 
   // Providers & Models
   "settings.provider.noModels": "No matching models found.",
+  "settings.provider.switchOnly": "switch only",
+  "settings.provider.switchOnlyHint": "OpenCode manages this provider's catalog; the switch controls whether its models appear in the model picker.",
   "settings.provider.disabled": "disabled",
   "settings.provider.toggle": "Provider availability",
   "settings.provider.enableHint": "Enable this provider and its models",
@@ -127,6 +129,8 @@ export const I18N_RU: Record<I18nKey, string> = {
 
   // Providers & Models
   "settings.provider.noModels": "Подходящие модели не найдены.",
+  "settings.provider.switchOnly": "только переключатель",
+  "settings.provider.switchOnlyHint": "Каталогом этого провайдера управляет OpenCode; переключатель определяет, показывать ли его модели в выборе моделей.",
   "settings.provider.disabled": "выключен",
   "settings.provider.toggle": "Доступность провайдера",
   "settings.provider.enableHint": "Включить провайдера и его модели",
