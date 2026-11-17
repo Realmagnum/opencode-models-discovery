@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onMount } from "solid-js"
+import { For, Show, createEffect, createSignal, onMount } from "solid-js"
 import { DiscoveryRpcDefinition, type RpcModelOverride, type RpcStatusOutput } from "./v2/rpc.js"
 import { resolveTranslation, type TranslationParams } from "./i18n.js"
 
@@ -13,6 +13,23 @@ interface Props {
 }
 
 const PLUGIN_ID = "opencode-models-discovery"
+const SERVER_STORAGE_KEY = "opencode-models-discovery:server"
+
+function readStoredServer(): string {
+  try {
+    return window.localStorage.getItem(SERVER_STORAGE_KEY) || "sidecar"
+  } catch {
+    return "sidecar"
+  }
+}
+
+function rememberServer(id: string): void {
+  try {
+    window.localStorage.setItem(SERVER_STORAGE_KEY, id)
+  } catch {
+    // Private storage or a locked profile; the picker still works for this window.
+  }
+}
 
 interface ServerInstall {
   readonly type: "package" | "local" | "unknown"
@@ -144,11 +161,28 @@ export function SettingsView(props: Props) {
   }
 
   const [loading, setLoading] = createSignal(false)
-  const [serverID, setServerID] = createSignal("sidecar")
+  const [serverID, setServerID] = createSignal(readStoredServer())
   const [availableServers, setAvailableServers] = createSignal<ServerEntry[]>([])
   const [serversChecked, setServersChecked] = createSignal(false)
   const [updatingServer, setUpdatingServer] = createSignal(false)
   const [togglingProvider, setTogglingProvider] = createSignal<string | null>(null)
+  let serverSelect: HTMLSelectElement | undefined
+
+  const chooseServer = (id: string) => {
+    setServerID(id)
+    rememberServer(id)
+  }
+
+  // Solid renders <option> children after the select's value binding, so a
+  // rebuilt option list can leave the browser on the first entry. Reapply the
+  // selected value once the new options exist.
+  createEffect(() => {
+    const id = serverID()
+    availableServers()
+    queueMicrotask(() => {
+      if (serverSelect && serverSelect.value !== id) serverSelect.value = id
+    })
+  })
   let statusRequest = 0
   const [refreshing, setRefreshing] = createSignal(false)
   const [statusData, setStatusData] = createSignal<RpcStatusOutput | null>(null)
@@ -250,6 +284,9 @@ export function SettingsView(props: Props) {
     }))
     setAvailableServers(results.filter((entry): entry is ServerEntry => entry !== null))
     setServersChecked(true)
+    // Only drop a selection whose server no longer exists in the app. A server
+    // that temporarily fails the probe keeps its entry so the choice survives.
+    if (serverID() !== "sidecar" && !props.servers.get(serverID())) chooseServer("sidecar")
   }
 
   const waitForSwitches = async (client: any): Promise<boolean> => {
@@ -547,19 +584,27 @@ export function SettingsView(props: Props) {
 
       <div style={{ display: "flex", gap: "10px", "align-items": "center", "margin-bottom": "16px", "flex-wrap": "wrap" }}>
         <label for="models-discovery-server">{t("settings.server")}</label>
-        <select id="models-discovery-server" value={serverID()} disabled={loading() || refreshing()} onChange={(event) => {
-          setServerID(event.currentTarget.value)
-          setStatusData(null)
-          setSelectedProvider("all")
-          setExpandedProviders({})
-          setEditingModel(null)
-          setTogglingProvider(null)
-          void fetchStatus()
-        }} style={buttonSecondary}>
+        <select
+          id="models-discovery-server"
+          ref={(el) => { serverSelect = el ?? undefined }}
+          disabled={updatingServer()}
+          onChange={(event) => {
+            chooseServer(event.currentTarget.value)
+            setStatusData(null)
+            setSelectedProvider("all")
+            setExpandedProviders({})
+            setEditingModel(null)
+            setTogglingProvider(null)
+            void fetchStatus()
+          }}
+          style={buttonSecondary}
+        >
           <Show when={!availableServers().some((server) => server.id === serverID())}>
-            <option value={serverID()}>{props.servers.get(serverID())?.name ?? serverID()}</option>
+            <option value={serverID()} selected={true}>{props.servers.get(serverID())?.name ?? serverID()}</option>
           </Show>
-          <For each={availableServers()}>{(server) => <option value={server.id}>{server.name}</option>}</For>
+          <For each={availableServers()}>
+            {(server) => <option value={server.id} selected={server.id === serverID()}>{server.name}</option>}
+          </For>
         </select>
         <button style={buttonSecondary} onClick={() => void discoverServers()}>{t("settings.servers.refresh")}</button>
         <Show when={serversChecked() && currentServer()?.install.version}>
