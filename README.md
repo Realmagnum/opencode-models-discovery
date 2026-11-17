@@ -101,6 +101,30 @@ opencode plugin update @realmagnum/opencode-models-discovery
 opencode service restart
 ```
 
+### Publishing (maintainers)
+
+npm trusted publishing can only be configured for a package that already exists, so the first version is published
+once by hand:
+
+```sh
+npm login
+npm publish --access public
+```
+
+Then bind releases to GitHub Actions OIDC (npm CLI 11.15+, 2FA enabled on the npm account):
+
+```sh
+npm trust github @realmagnum/opencode-models-discovery \
+  --repo Realmagnum/opencode-models-discovery \
+  --file publish.yml \
+  --allow-publish --yes
+```
+
+From then on, pushing a version bump to `main` publishes through `.github/workflows/publish.yml` with OIDC and
+provenance, without long-lived tokens. Use `--allow-stage-publish` instead of `--allow-publish` to require a manual
+approval of each release. Afterwards, enabling "Require two-factor authentication and disallow tokens" in the package
+publishing settings keeps token publishing closed.
+
 
 ## OpenCode v1 (legacy compatibility)
 
