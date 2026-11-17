@@ -1,7 +1,10 @@
 # opencode-models-discovery
 
-[![npm version](https://img.shields.io/npm/v/opencode-models-discovery.svg?color=blue)](https://www.npmjs.com/package/opencode-models-discovery)
-[![npm downloads](https://img.shields.io/npm/dt/opencode-models-discovery.svg)](https://www.npmjs.com/package/opencode-models-discovery)
+> **Fork notice.** This is the `@realmagnum/opencode-models-discovery` fork. It adds OpenCode Desktop settings for
+> provider switches and per-server management on top of upstream `opencode-models-discovery`.
+
+[![npm version](https://img.shields.io/npm/v/@realmagnum/opencode-models-discovery.svg?color=blue)](https://www.npmjs.com/package/@realmagnum/opencode-models-discovery)
+[![npm downloads](https://img.shields.io/npm/dt/@realmagnum/opencode-models-discovery.svg)](https://www.npmjs.com/package/@realmagnum/opencode-models-discovery)
 [![release](https://github.com/yuhp/opencode-models-discovery/actions/workflows/release.yml/badge.svg)](https://github.com/yuhp/opencode-models-discovery/actions/workflows/release.yml)
 [![license](https://img.shields.io/github/license/yuhp/opencode-models-discovery)](https://github.com/yuhp/opencode-models-discovery/blob/main/LICENSE)
 [![OpenCode v1](https://img.shields.io/badge/OpenCode%20v1-%3E%3D1.18.29-blueviolet)](https://opencode.ai/docs)
@@ -29,7 +32,7 @@ OpenCode v2 uses `plugins` and `providers`. Discovery settings belong under `pro
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
-    "opencode-models-discovery@2.1.1"
+    "@realmagnum/opencode-models-discovery@2.2.0"
   ],
   "providers": {
     "gateway": {
@@ -66,6 +69,36 @@ For the complete V2 configuration reference, see [Configuration Guide](docs/conf
 
 V2 caching is disabled by default and uses OpenCode's host-provided storage when enabled. After rebuilding a local plugin, restart the background service with `opencode service restart`.
 
+## OpenCode Desktop
+
+The settings page lives under **Settings → Model Discovery** and adds:
+
+- **Provider switches.** Turning a provider off keeps its configuration and discovery intact; only its models are
+  suppressed, so it can always be switched back on. The state is stored by the plugin and survives restarts.
+- **Server picker.** The page lists desktop servers where this plugin answers, and applies refresh, cache, override and
+  provider-switch actions on the selected server.
+- **In-place updates.** When a server runs an outdated build, the page offers **Update plugin** for package installs.
+  Updates use OpenCode's own plugin update API, not shell commands. Local directory installs show their path instead.
+
+### Installing and updating on servers
+
+Install the plugin as a package so updates are atomic and the in-place update button works:
+
+```sh
+opencode plugin add @realmagnum/opencode-models-discovery@2.2.0
+opencode plugin list
+```
+
+Remove local copies first: a directory under `~/.config/opencode/plugins/opencode-models-discovery` is discovered
+automatically and would load twice. Keep local directories only for development, and point `plugins` at the checkout
+instead.
+
+```sh
+opencode plugin update @realmagnum/opencode-models-discovery
+opencode service restart
+```
+
+
 ## OpenCode v1 (legacy compatibility)
 
 For OpenCode v1 (`1.18.29+`), use `plugin`, `provider`, and `options`:
@@ -73,7 +106,7 @@ For OpenCode v1 (`1.18.29+`), use `plugin`, `provider`, and `options`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-models-discovery@2.1.1"],
+  "plugin": ["@realmagnum/opencode-models-discovery@2.2.0"],
   "provider": {
     "lmstudio": {
       "npm": "@ai-sdk/openai-compatible",
