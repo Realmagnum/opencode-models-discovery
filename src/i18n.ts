@@ -8,6 +8,16 @@ export const I18N_EN = {
   "settings.header.title": "OpenAI-Compatible Model Discovery",
   "settings.header.desc": "Dynamic model catalog sync for OpenAI-compatible providers, gateways, and local backends.",
 
+  // Servers
+  "settings.server": "Server",
+  "settings.servers.refresh": "Find servers",
+  "settings.servers.switchUnsupported": "Provider switches need a newer opencode-models-discovery build on this server.",
+  "settings.servers.localHint": "Installed from a local directory ({{path}}); update it on that machine.",
+  "settings.servers.update": "Update plugin",
+  "settings.servers.updating": "Updating…",
+  "settings.servers.updateTitle": "Plugin Update",
+  "settings.servers.updateHint": "Update opencode-models-discovery on this server and reload it",
+
   // Action Buttons
   "settings.action.clearCache": "Clear Cache",
   "settings.action.refresh": "Refresh Catalog",
@@ -32,6 +42,11 @@ export const I18N_EN = {
 
   // Providers & Models
   "settings.provider.noModels": "No matching models found.",
+  "settings.provider.disabled": "disabled",
+  "settings.provider.toggle": "Provider availability",
+  "settings.provider.enableHint": "Enable this provider and its models",
+  "settings.provider.disableHint": "Disable this provider without removing its configuration",
+  "settings.provider.toggleUnsupported": "Provider switches are unavailable on this server",
   "settings.model.context": "Context",
   "settings.model.output": "Output",
   "settings.model.tools": "Tools",
@@ -55,6 +70,15 @@ export const I18N_EN = {
   "toast.cacheClearedMsg": "Cleared discovery storage and in-memory cache.",
   "toast.overrideSaved": "Updated overrides for {{model}}",
   "toast.overrideReset": "Reset overrides for {{model}}",
+  "toast.providerSwitchTitle": "Provider Switch",
+  "toast.providerEnabled": "{{provider}} is available again.",
+  "toast.providerDisabled": "{{provider}} is disabled; its configuration is kept.",
+  "toast.providerSwitchFailed": "Failed to change provider availability",
+  "toast.providerSwitchUnsupported": "This server runs an older plugin build; update opencode-models-discovery there.",
+  "toast.pluginUpdated": "opencode-models-discovery was updated on {{server}}.",
+  "toast.pluginUpdatedReload": "The plugin was updated on {{server}}, but it has not reconnected yet. Reload the server if provider switches stay unavailable.",
+  "toast.pluginUpdateFailed": "The plugin update failed on this server.",
+  "toast.pluginUpdateLocal": "This server loads the plugin from a local directory ({{path}}); update and rebuild it on that machine.",
 
   "gear.title": "Open Model Discovery settings",
 }
@@ -66,6 +90,16 @@ export const I18N_RU: Record<I18nKey, string> = {
   "settings.navTitle": "Обнаружение моделей",
   "settings.header.title": "Автообнаружение моделей OpenAI-совместимых провайдеров",
   "settings.header.desc": "Динамическая синхронизация каталога моделей для OpenAI-совместимых шлюзов, провайдеров и локальных бэкендов.",
+
+  // Servers
+  "settings.server": "Сервер",
+  "settings.servers.refresh": "Найти серверы",
+  "settings.servers.switchUnsupported": "Для переключения провайдеров нужна более новая сборка opencode-models-discovery на этом сервере.",
+  "settings.servers.localHint": "Установлен из локального каталога ({{path}}); обновите его на той машине.",
+  "settings.servers.update": "Обновить плагин",
+  "settings.servers.updating": "Обновление…",
+  "settings.servers.updateTitle": "Обновление плагина",
+  "settings.servers.updateHint": "Обновить opencode-models-discovery на этом сервере и перезагрузить его",
 
   // Action Buttons
   "settings.action.clearCache": "Очистить кэш",
@@ -91,6 +125,11 @@ export const I18N_RU: Record<I18nKey, string> = {
 
   // Providers & Models
   "settings.provider.noModels": "Подходящие модели не найдены.",
+  "settings.provider.disabled": "выключен",
+  "settings.provider.toggle": "Доступность провайдера",
+  "settings.provider.enableHint": "Включить провайдера и его модели",
+  "settings.provider.disableHint": "Выключить провайдера, сохранив его настройки",
+  "settings.provider.toggleUnsupported": "Переключение провайдеров недоступно на этом сервере",
   "settings.model.context": "Контекст",
   "settings.model.output": "Вывод",
   "settings.model.tools": "Инструменты",
@@ -114,6 +153,15 @@ export const I18N_RU: Record<I18nKey, string> = {
   "toast.cacheClearedMsg": "Кэш хранилища и оперативной памяти очищен.",
   "toast.overrideSaved": "Параметры обновлены для {{model}}",
   "toast.overrideReset": "Сброшены параметры для {{model}}",
+  "toast.providerSwitchTitle": "Провайдер",
+  "toast.providerEnabled": "{{provider}} снова доступен.",
+  "toast.providerDisabled": "{{provider}} выключен; настройки сохранены.",
+  "toast.providerSwitchFailed": "Не удалось изменить доступность провайдера",
+  "toast.providerSwitchUnsupported": "На этом сервере старая сборка плагина; обновите opencode-models-discovery.",
+  "toast.pluginUpdated": "opencode-models-discovery обновлён на сервере {{server}}.",
+  "toast.pluginUpdatedReload": "Плагин обновлён на сервере {{server}}, но ещё не переподключился. Перезагрузите сервер, если переключатели недоступны.",
+  "toast.pluginUpdateFailed": "Не удалось обновить плагин на этом сервере.",
+  "toast.pluginUpdateLocal": "На этом сервере плагин загружается из локального каталога ({{path}}); обновите и пересоберите его на той машине.",
 
   "gear.title": "Открыть настройки обнаружения моделей",
 }

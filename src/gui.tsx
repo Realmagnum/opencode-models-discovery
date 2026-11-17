@@ -100,7 +100,8 @@ export default Plugin.define({
       title: ctx.t("settings.navTitle"),
       render: () => (
         <SettingsView
-          client={ctx.client}
+          client={() => ctx.client}
+          servers={ctx.servers}
           t={(k, p) => ctx.t(k, p)}
           locale={() => ctx.locale.locale()}
           toast={{
@@ -119,4 +120,3 @@ export default Plugin.define({
     setupExtensionSettingsGearInjection("models-discovery", "models-discovery")
   },
 })
-

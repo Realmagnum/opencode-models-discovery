@@ -37,26 +37,47 @@ function sameOptional(left: string | undefined, right: string | undefined): bool
   return left === right
 }
 
+function matchesIdentity(entry: DiscoveryCacheIdentity, identity: DiscoveryCacheIdentity): boolean {
+  return entry.providerID === identity.providerID &&
+    entry.baseURL === identity.baseURL &&
+    entry.endpoint === identity.endpoint &&
+    sameOptional(entry.modelInfoFormat, identity.modelInfoFormat) &&
+    sameOptional(entry.modelInfoEndpoint, identity.modelInfoEndpoint)
+}
+
+function parseCacheEntryShape(value: unknown, identity: DiscoveryCacheIdentity): DiscoveryCacheEntry | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const entry = value as Partial<DiscoveryCacheEntry>
+  if (entry.version !== 1 || !entry.identity || typeof entry.fetchedAt !== 'string') return undefined
+  if (!matchesIdentity(entry.identity, identity)) return undefined
+  if (!Number.isFinite(Date.parse(entry.fetchedAt)) ||
+    !Array.isArray(entry.rawModels) ||
+    !entry.enrichments || typeof entry.enrichments !== 'object' || Array.isArray(entry.enrichments)) {
+    return undefined
+  }
+  return entry as DiscoveryCacheEntry
+}
+
 export function parseDiscoveryCacheEntry(
   value: unknown,
   identity: DiscoveryCacheIdentity,
   ttlSeconds: number,
   now: number = Date.now(),
 ): DiscoveryCacheEntry | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const entry = value as Partial<DiscoveryCacheEntry>
-  if (entry.version !== 1 || !entry.identity || typeof entry.fetchedAt !== 'string') return undefined
-  if (entry.identity.providerID !== identity.providerID ||
-    entry.identity.baseURL !== identity.baseURL ||
-    entry.identity.endpoint !== identity.endpoint ||
-    !sameOptional(entry.identity.modelInfoFormat, identity.modelInfoFormat) ||
-    !sameOptional(entry.identity.modelInfoEndpoint, identity.modelInfoEndpoint) ||
-    !isDiscoveryCacheFresh(entry.fetchedAt, ttlSeconds, now) ||
-    !Array.isArray(entry.rawModels) ||
-    !entry.enrichments || typeof entry.enrichments !== 'object' || Array.isArray(entry.enrichments)) {
-    return undefined
-  }
-  return entry as DiscoveryCacheEntry
+  const entry = parseCacheEntryShape(value, identity)
+  if (!entry || !isDiscoveryCacheFresh(entry.fetchedAt, ttlSeconds, now)) return undefined
+  return entry
+}
+
+/**
+ * Parses a cache entry without applying the TTL. Used as a last-resort fallback
+ * so a transient outage cannot empty the catalog on a cold start.
+ */
+export function parseStaleDiscoveryCacheEntry(
+  value: unknown,
+  identity: DiscoveryCacheIdentity,
+): DiscoveryCacheEntry | undefined {
+  return parseCacheEntryShape(value, identity)
 }
 
 export function createDiscoveryCacheEntry(
@@ -99,6 +120,19 @@ export async function readDiscoveryCache(
 ): Promise<DiscoveryCacheEntry | undefined> {
   try {
     return parseDiscoveryCacheEntry(await backend.get(key), identity, ttlSeconds)
+  } catch {
+    return undefined
+  }
+}
+
+/** Reads a cache entry regardless of its age; freshness is decided by the caller. */
+export async function readStaleDiscoveryCache(
+  backend: DiscoveryCacheBackend,
+  key: string,
+  identity: DiscoveryCacheIdentity,
+): Promise<DiscoveryCacheEntry | undefined> {
+  try {
+    return parseStaleDiscoveryCacheEntry(await backend.get(key), identity)
   } catch {
     return undefined
   }

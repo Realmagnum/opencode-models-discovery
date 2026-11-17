@@ -18,6 +18,11 @@ export interface ProviderDiscoveryOptions {
   readonly modelInfoFormat?: ModelInfoFormat
   readonly modelInfoEndpoint?: string
   readonly filterNonChat: boolean
+  /**
+   * How often the inventory is re-discovered, in seconds. 0 disables the timer.
+   * When several providers set it, the smallest positive value wins.
+   */
+  readonly refreshIntervalSeconds?: number
   readonly cache?: {
     readonly enabled: boolean
     readonly ttlSeconds: number
@@ -84,6 +89,9 @@ export function parseProviderDiscoveryOptions(raw: unknown): ProviderDiscoveryOp
 
   // Default filterNonChat to true when LiteLLM or ModelsDev is active, matching V1 behavior
   const filterNonChat = typeof value.filterNonChat === "boolean" ? value.filterNonChat : true
+  const refreshIntervalSeconds = typeof value.refreshIntervalSeconds === "number" && Number.isFinite(value.refreshIntervalSeconds) && value.refreshIntervalSeconds >= 0
+    ? Math.floor(value.refreshIntervalSeconds)
+    : undefined
   const cacheValue = object(value.cache)
   const cache = cacheValue?.enabled === true
     ? {
@@ -106,6 +114,7 @@ export function parseProviderDiscoveryOptions(raw: unknown): ProviderDiscoveryOp
     modelInfoFormat,
     modelInfoEndpoint,
     filterNonChat,
+    refreshIntervalSeconds,
     cache,
   }
 }

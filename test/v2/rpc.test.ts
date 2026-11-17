@@ -11,6 +11,8 @@ describe("DiscoveryRpcDefinition", () => {
     expect(DiscoveryRpcDefinition.methods).toHaveProperty("overrideList")
     expect(DiscoveryRpcDefinition.methods).toHaveProperty("overrideSet")
     expect(DiscoveryRpcDefinition.methods).toHaveProperty("overrideDelete")
+    expect(DiscoveryRpcDefinition.methods).toHaveProperty("providerList")
+    expect(DiscoveryRpcDefinition.methods).toHaveProperty("providerSetEnabled")
   })
 
   it("registers RPC handlers on host during setupV2", async () => {
@@ -64,6 +66,10 @@ describe("DiscoveryRpcDefinition", () => {
         set: vi.fn().mockImplementation(async (k: string, v: unknown) => { mockStorage.set(k, v) }),
         remove: vi.fn().mockImplementation(async (k: string) => { mockStorage.delete(k) }),
       },
+      model: {
+        transform: vi.fn().mockResolvedValue({ dispose: vi.fn() }),
+        reload: vi.fn().mockResolvedValue(undefined),
+      },
       rpc: {
         register: registerMock,
       },
@@ -93,5 +99,24 @@ describe("DiscoveryRpcDefinition", () => {
     const refreshResult = await registeredHandlers!["refresh"]({ force: true }, {} as any)
     expect(refreshResult).toHaveProperty("providers")
     expect(refreshResult).toHaveProperty("models")
+
+    // Test provider switches
+    const listed = await registeredHandlers!["providerList"]({}, {} as any)
+    expect(listed.providers).toEqual([
+      { id: "test-prov", name: "Test Provider", enabled: true, modelCount: expect.any(Number) },
+    ])
+
+    const disabled = await registeredHandlers!["providerSetEnabled"]({ providerID: "test-prov", enabled: false }, {} as any)
+    expect(disabled.providers[0].enabled).toBe(false)
+    expect(mockStorage.get("providers:disabled")).toMatchObject({ version: 1, disabled: ["test-prov"] })
+    expect(ctx.model.reload).toHaveBeenCalled()
+
+    const enabled = await registeredHandlers!["providerSetEnabled"]({ providerID: "test-prov", enabled: true }, {} as any)
+    expect(enabled.providers[0].enabled).toBe(true)
+    expect(mockStorage.get("providers:disabled")).toMatchObject({ version: 1, disabled: [] })
+
+    await expect(
+      registeredHandlers!["providerSetEnabled"]({ providerID: "missing", enabled: false }, {} as any),
+    ).rejects.toThrow("Unknown provider")
   })
 })

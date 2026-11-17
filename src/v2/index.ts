@@ -7,11 +7,34 @@ import type { RefreshResult } from "./tools.js"
 import { createV2StorageCache } from "./storage-cache.js"
 import { discoveryCacheKey, isDiscoveryCacheFresh, sanitizeSensitiveFields } from "../core/discovery-cache.js"
 import { resolveProviderCredential } from "./credential-resolver.js"
-import { DiscoveryRpcDefinition, type RpcCacheEntry } from "./rpc.js"
+import { DiscoveryRpcDefinition, type RpcCacheEntry, type RpcProviderState } from "./rpc.js"
 import { applyModelOverride, deleteModelOverride, listModelOverrides, setModelOverride } from "./overrides.js"
+import {
+  applyDisabledProviders,
+  isProviderEnabled,
+  loadDisabledProviders,
+  saveDisabledProviders,
+} from "./provider-prefs.js"
 
 export function integrationID(providerID: string): string {
   return providerID
+}
+
+const DEFAULT_REFRESH_INTERVAL_SECONDS = 300
+
+/**
+ * Periodic refresh keeps the catalog alive without user action. Providers may
+ * opt into a different cadence; the smallest positive value wins and 0 disables
+ * the timer only when every provider asks for it.
+ */
+export function resolveRefreshIntervalSeconds(discovery: ReadonlyMap<string, ProviderDiscoveryOptions>): number {
+  const configured = [...discovery.values()]
+    .map((options) => options.refreshIntervalSeconds)
+    .filter((value): value is number => typeof value === "number")
+  if (configured.length === 0) return DEFAULT_REFRESH_INTERVAL_SECONDS
+  if (configured.every((value) => value === 0)) return 0
+  const positive = configured.filter((value) => value > 0)
+  return positive.length > 0 ? Math.min(...positive) : DEFAULT_REFRESH_INTERVAL_SECONDS
 }
 
 interface ListedProvider {
@@ -85,8 +108,41 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
   const providers: ConfiguredProvider[] = []
   const discovery = new Map<string, ProviderDiscoveryOptions>()
   const controller = createProviderController(ctx, providers, integrationID)
+  const disabledProviders = new Set<string>()
+  for (const providerID of await loadDisabledProviders(ctx.storage)) disabledProviders.add(providerID)
   let baselineInventory: Inventory = new Map()
   let transformsRegistration: Promise<void> | undefined
+  const modelDomain = ctx.model && typeof ctx.model.transform === "function" ? ctx.model : undefined
+
+  // Provider switches keep every provider registered and suppress only its
+  // models, so the settings page can switch it back on later. The transform
+  // replays after each provider reload and covers models discovered afterwards.
+  if (modelDomain) {
+    await modelDomain.transform((editor) => {
+      applyDisabledProviders({
+        list: (providerID) => editor.list(providerID as never) as unknown as readonly { readonly id: string; readonly enabled?: boolean }[],
+        disable: (providerID, modelID) => {
+          editor.update(providerID as never, modelID as never, (model) => {
+            model.enabled = false
+          })
+        },
+      }, disabledProviders)
+    })
+  }
+
+  const reloadModels = async (): Promise<void> => {
+    if (modelDomain && typeof modelDomain.reload === "function") await modelDomain.reload()
+  }
+
+  const providerStates = (): RpcProviderState[] => {
+    const inventory = controller.getInventory()
+    return providers.map((provider) => ({
+      id: provider.id,
+      name: provider.name ?? provider.id,
+      enabled: isProviderEnabled(disabledProviders, provider.id),
+      modelCount: inventory.get(provider.id)?.size ?? 0,
+    }))
+  }
 
   const ensureTransformsRegistered = async (): Promise<void> => {
     if (!transformsRegistration) {
@@ -265,6 +321,7 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
             id: provider.id,
             name: provider.name ?? provider.id,
             modelCount: provider.models.length,
+            enabled: isProviderEnabled(disabledProviders, provider.id),
             models: provider.models.map((model) => ({
               id: model.id,
               name: model.name,
@@ -311,7 +368,7 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
       },
       refresh: async (rawInput) => {
         const input = rawInput as { readonly force?: boolean } | undefined
-        const result = await refreshFromCurrentConfig(input?.force === true)
+        const result = await refreshFromCurrentConfig(input?.force !== false)
         return { providers: result.providers, models: result.models }
       },
       cacheInspect: async (rawInput) => {
@@ -421,12 +478,48 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
         await refreshFromCurrentConfig(true)
         return { success: deleted }
       },
+      providerList: async () => {
+        await syncConfiguredProviders()
+        return { providers: providerStates() }
+      },
+      providerSetEnabled: async (rawInput) => {
+        const input = rawInput as { readonly providerID: string; readonly enabled: boolean }
+        await syncConfiguredProviders()
+        if (!providers.some((provider) => provider.id === input.providerID)) {
+          throw new Error(`Unknown provider: ${input.providerID}`)
+        }
+        if (input.enabled) disabledProviders.delete(input.providerID)
+        else disabledProviders.add(input.providerID)
+        try {
+          await saveDisabledProviders(ctx.storage, disabledProviders)
+        } catch (error) {
+          // Keep the in-memory switch aligned with storage when persisting fails.
+          if (input.enabled) disabledProviders.add(input.providerID)
+          else disabledProviders.delete(input.providerID)
+          throw error
+        }
+        await reloadModels()
+        return { providers: providerStates() }
+      },
     })
   }
 
   await refreshFromCurrentConfig()
 
   const abort = new AbortController()
+
+  const refreshIntervalSeconds = resolveRefreshIntervalSeconds(discovery)
+  let refreshTimer: ReturnType<typeof setInterval> | undefined
+  if (refreshIntervalSeconds > 0) {
+    refreshTimer = setInterval(() => {
+      if (abort.signal.aborted) return
+      void refreshFromCurrentConfig().catch(() => {
+        // A failed refresh is non-fatal: the inventory keeps its last known state.
+      })
+    }, refreshIntervalSeconds * 1000)
+    ;(refreshTimer as { unref?: () => void }).unref?.()
+  }
+
   if (providers.length === 0) {
     void (async () => {
       for (let attempt = 0; attempt < 10 && !abort.signal.aborted; attempt++) {
@@ -464,9 +557,12 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
         // should not happen, but if it does, we don't want to crash the plugin
       }
     }
-})()
+  })()
 
-  return () => abort.abort()
+  return () => {
+    abort.abort()
+    if (refreshTimer) clearInterval(refreshTimer)
+  }
 }
 
 export default Plugin.define({

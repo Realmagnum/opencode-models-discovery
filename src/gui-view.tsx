@@ -3,12 +3,57 @@ import { DiscoveryRpcDefinition, type RpcModelOverride, type RpcStatusOutput } f
 import { resolveTranslation, type TranslationParams } from "./i18n.js"
 
 interface Props {
-  readonly client: any
+  readonly client: () => any
+  readonly servers: { list(): readonly string[]; get(id: string): { name: string; client: any; connected: boolean; compatible: boolean } | undefined }
   readonly t?: (key: string, params?: TranslationParams) => string
   readonly locale?: () => string | undefined
   readonly toast?: {
     show(options: { title: string; message: string; variant?: "info" | "success" | "warning" | "error" }): void
   }
+}
+
+const PLUGIN_ID = "opencode-models-discovery"
+
+interface ServerInstall {
+  readonly type: "package" | "local" | "unknown"
+  readonly target?: string
+  readonly path?: string
+  readonly version?: string
+  readonly outdated?: boolean
+}
+
+interface ServerEntry {
+  readonly id: string
+  readonly name: string
+  readonly canToggle: boolean
+  readonly install: ServerInstall
+}
+
+function pluginInstall(info: any): ServerInstall {
+  const source = info?.source
+  if (!source || typeof source !== "object") return { type: "unknown" }
+  if (source.type === "package") {
+    return {
+      type: "package",
+      target: typeof source.target === "string" ? source.target : undefined,
+      version: typeof source.version === "string" ? source.version : undefined,
+      outdated: source.outdated === true,
+    }
+  }
+  if (source.type === "local") {
+    return { type: "local", path: typeof source.path === "string" ? source.path : undefined }
+  }
+  return { type: "unknown" }
+}
+
+function isThisPlugin(info: any): boolean {
+  if (!info || typeof info !== "object") return false
+  if (info.id === PLUGIN_ID) return true
+  const source = info.source
+  if (!source || typeof source !== "object") return false
+  if (typeof source.target === "string" && source.target.includes(PLUGIN_ID)) return true
+  if (typeof source.path === "string" && source.path.includes(PLUGIN_ID)) return true
+  return false
 }
 
 const sectionHeader: Record<string, string> = {
@@ -99,6 +144,12 @@ export function SettingsView(props: Props) {
   }
 
   const [loading, setLoading] = createSignal(false)
+  const [serverID, setServerID] = createSignal("sidecar")
+  const [availableServers, setAvailableServers] = createSignal<ServerEntry[]>([])
+  const [serversChecked, setServersChecked] = createSignal(false)
+  const [updatingServer, setUpdatingServer] = createSignal(false)
+  const [togglingProvider, setTogglingProvider] = createSignal<string | null>(null)
+  let statusRequest = 0
   const [refreshing, setRefreshing] = createSignal(false)
   const [statusData, setStatusData] = createSignal<RpcStatusOutput | null>(null)
   const [search, setSearch] = createSignal("")
@@ -145,23 +196,118 @@ export function SettingsView(props: Props) {
   const [editTools, setEditTools] = createSignal<boolean>(true)
   const [editReasoning, setEditReasoning] = createSignal<boolean>(false)
 
-  const rpc = () => props.client?.rpc ? props.client.rpc(DiscoveryRpcDefinition) : null
+  const rpc = () => {
+    const client = props.servers.get(serverID())?.client ?? (serverID() === "sidecar" ? props.client() : undefined)
+    return client?.rpc ? client.rpc(DiscoveryRpcDefinition) : null
+  }
+
+  const currentServer = (): ServerEntry | undefined => availableServers().find((entry) => entry.id === serverID())
+
+  const serverSupportsSwitches = (): boolean => currentServer()?.canToggle ?? false
+
+  const canUpdateServer = (): boolean => {
+    const install = currentServer()?.install
+    return install?.type === "package" && Boolean(install.target)
+  }
+
+  const discoverServers = async () => {
+    const results = await Promise.all(props.servers.list().map(async (id) => {
+      const server = props.servers.get(id)
+      if (!server || !server.connected || !server.compatible) return null
+      const rpc = server.client?.rpc ? server.client.rpc(DiscoveryRpcDefinition) : null
+      if (!rpc) return null
+      try {
+        await rpc.status({})
+      } catch {
+        // The plugin is not installed on this server.
+        return null
+      }
+      let canToggle = false
+      try {
+        // Older plugin builds answer status but have no provider switches.
+        await rpc.providerList({})
+        canToggle = true
+      } catch {
+        canToggle = false
+      }
+      let install: ServerInstall = { type: "unknown" }
+      try {
+        const listed = await server.client.plugin.list()
+        const entries = Array.isArray(listed) ? listed : listed?.data ?? []
+        const info = entries.find(isThisPlugin)
+        if (info) install = pluginInstall(info)
+      } catch {
+        // Plugin inventory is unavailable; fall back to the capability probe.
+      }
+      return { id, name: server.name, canToggle, install }
+    }))
+    setAvailableServers(results.filter((entry): entry is ServerEntry => entry !== null))
+    setServersChecked(true)
+  }
+
+  const waitForSwitches = async (client: any): Promise<boolean> => {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      try {
+        await client.rpc(DiscoveryRpcDefinition).providerList({})
+        return true
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 1_250))
+      }
+    }
+    return false
+  }
+
+  const handleUpdateServer = async () => {
+    const server = currentServer()
+    const install = server?.install
+    if (!server || install?.type !== "package" || !install.target) {
+      props.toast?.show({
+        title: t("settings.servers.updateTitle"),
+        message: t("toast.pluginUpdateLocal", { path: install?.path ?? serverID() }),
+        variant: "warning",
+      })
+      return
+    }
+    const client = props.servers.get(serverID())?.client ?? (serverID() === "sidecar" ? props.client() : undefined)
+    if (!client?.plugin?.update) return
+    setUpdatingServer(true)
+    try {
+      await client.plugin.update({ targets: [install.target] })
+      const ready = await waitForSwitches(client)
+      await discoverServers()
+      await fetchStatus()
+      props.toast?.show({
+        title: t("settings.servers.updateTitle"),
+        message: ready ? t("toast.pluginUpdated", { server: server.name }) : t("toast.pluginUpdatedReload", { server: server.name }),
+        variant: ready ? "success" : "warning",
+      })
+    } catch (error: any) {
+      props.toast?.show({
+        title: t("settings.servers.updateTitle"),
+        message: error?.message || t("toast.pluginUpdateFailed"),
+        variant: "error",
+      })
+    } finally {
+      setUpdatingServer(false)
+    }
+  }
 
   const fetchStatus = async () => {
+    const request = ++statusRequest
     const client = rpc()
     if (!client) return
     setLoading(true)
     try {
       const data = await client.status({ details: true, rawCache: true })
-      setStatusData(data)
+      if (request === statusRequest) setStatusData(data)
     } catch (e: any) {
-      props.toast?.show({
+      if (request === statusRequest) props.toast?.show({
         title: "Model Discovery",
         message: e?.message || "Failed to load discovery status",
         variant: "error",
       })
     } finally {
-      setLoading(false)
+      if (request === statusRequest) setLoading(false)
     }
   }
 
@@ -205,6 +351,37 @@ export function SettingsView(props: Props) {
         message: e?.message || "Failed to clear cache",
         variant: "error",
       })
+    }
+  }
+
+  const handleToggleProvider = async (providerID: string, enabled: boolean) => {
+    const client = rpc()
+    if (!client) return
+    if (typeof client.providerSetEnabled !== "function") {
+      props.toast?.show({
+        title: t("toast.providerSwitchTitle"),
+        message: t("toast.providerSwitchUnsupported"),
+        variant: "warning",
+      })
+      return
+    }
+    setTogglingProvider(providerID)
+    try {
+      await client.providerSetEnabled({ providerID, enabled })
+      await fetchStatus()
+      props.toast?.show({
+        title: t("toast.providerSwitchTitle"),
+        message: enabled ? t("toast.providerEnabled", { provider: providerID }) : t("toast.providerDisabled", { provider: providerID }),
+        variant: "info",
+      })
+    } catch (e: any) {
+      props.toast?.show({
+        title: t("toast.providerSwitchTitle"),
+        message: e?.message || t("toast.providerSwitchFailed"),
+        variant: "error",
+      })
+    } finally {
+      setTogglingProvider(null)
     }
   }
 
@@ -288,6 +465,7 @@ export function SettingsView(props: Props) {
   }
 
   onMount(() => {
+    void discoverServers()
     void fetchStatus()
   })
 
@@ -358,6 +536,45 @@ export function SettingsView(props: Props) {
             {refreshing() ? t("settings.action.refreshing") : t("settings.action.refresh")}
           </button>
         </div>
+      </div>
+
+      <div style={{ display: "flex", gap: "10px", "align-items": "center", "margin-bottom": "16px", "flex-wrap": "wrap" }}>
+        <label for="models-discovery-server">{t("settings.server")}</label>
+        <select id="models-discovery-server" value={serverID()} disabled={loading() || refreshing()} onChange={(event) => {
+          setServerID(event.currentTarget.value)
+          setStatusData(null)
+          setSelectedProvider("all")
+          setExpandedProviders({})
+          setEditingModel(null)
+          setTogglingProvider(null)
+          void fetchStatus()
+        }} style={buttonSecondary}>
+          <Show when={!availableServers().some((server) => server.id === serverID())}>
+            <option value={serverID()}>{props.servers.get(serverID())?.name ?? serverID()}</option>
+          </Show>
+          <For each={availableServers()}>{(server) => <option value={server.id}>{server.name}</option>}</For>
+        </select>
+        <button style={buttonSecondary} onClick={() => void discoverServers()}>{t("settings.servers.refresh")}</button>
+        <Show when={serversChecked() && currentServer()?.install.version}>
+          <span style={{ ...tagStyle, "font-size": "11px" }}>{currentServer()?.install.version}</span>
+        </Show>
+        <Show when={serversChecked() && !serverSupportsSwitches()}>
+          <span style={{ "font-size": "11.5px", color: "var(--text-subdued, #94a3b8)" }}>
+            {currentServer()?.install.type === "local"
+              ? t("settings.servers.localHint", { path: currentServer()?.install.path ?? serverID() })
+              : t("settings.servers.switchUnsupported")}
+          </span>
+        </Show>
+        <Show when={serversChecked() && canUpdateServer() && (!serverSupportsSwitches() || currentServer()?.install.outdated)}>
+          <button
+            style={{ ...buttonSecondary, "font-size": "11.5px", padding: "5px 10px" }}
+            title={t("settings.servers.updateHint")}
+            disabled={updatingServer()}
+            onClick={() => void handleUpdateServer()}
+          >
+            {updatingServer() ? t("settings.servers.updating") : t("settings.servers.update")}
+          </button>
+        </Show>
       </div>
 
       {/* Summary Banner */}
@@ -441,8 +658,10 @@ export function SettingsView(props: Props) {
       <For each={filteredProviders()}>
         {(provider) => {
           const expanded = () => isProviderExpanded(provider.id)
+          const enabled = () => provider.enabled !== false
+          const busy = () => togglingProvider() === provider.id
           return (
-            <div style={cardStyle}>
+            <div style={{ ...cardStyle, ...(enabled() ? {} : { opacity: "0.6" }) }}>
               {/* Provider Header / Accordion Trigger */}
               <div
                 style={{
@@ -480,11 +699,53 @@ export function SettingsView(props: Props) {
                   <code style={{ "font-size": "11px", color: "var(--text-subdued, #94a3b8)", background: "rgba(255, 255, 255, 0.05)", padding: "1px 5px", "border-radius": "4px" }}>
                     {provider.id}
                   </code>
-                  <span style={badgeStyle(true)}>
-                    {provider.models.length} models
+                  <span style={badgeStyle(enabled())}>
+                    {enabled() ? `${provider.models.length} models` : t("settings.provider.disabled")}
                   </span>
                 </div>
-                <div style={{ display: "flex", gap: "6px", "align-items": "center" }}>
+                <div style={{ display: "flex", gap: "8px", "align-items": "center" }}>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={enabled()}
+                    aria-label={t("settings.provider.toggle")}
+                    title={
+                      serverSupportsSwitches()
+                        ? enabled()
+                          ? t("settings.provider.disableHint")
+                          : t("settings.provider.enableHint")
+                        : t("settings.provider.toggleUnsupported")
+                    }
+                    disabled={busy() || !serversChecked() || !serverSupportsSwitches()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void handleToggleProvider(provider.id, !enabled())
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      "align-items": "center",
+                      width: "34px",
+                      height: "18px",
+                      padding: "2px",
+                      "border-radius": "9px",
+                      border: "1px solid " + (enabled() ? "rgba(34, 197, 94, 0.5)" : "rgba(148, 163, 184, 0.35)"),
+                      background: enabled() ? "rgba(34, 197, 94, 0.25)" : "rgba(148, 163, 184, 0.15)",
+                      cursor: busy() || !serversChecked() || !serverSupportsSwitches() ? "not-allowed" : "pointer",
+                      opacity: busy() ? 0.5 : 1,
+                      "justify-content": enabled() ? "flex-end" : "flex-start",
+                      transition: "background 0.15s ease",
+                      "flex-shrink": 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "12px",
+                        height: "12px",
+                        "border-radius": "50%",
+                        background: enabled() ? "#4ade80" : "#94a3b8",
+                      }}
+                    />
+                  </button>
                   <button
                     style={{ ...buttonSecondary, "font-size": "11px", padding: "3px 8px" }}
                     onClick={(e) => {

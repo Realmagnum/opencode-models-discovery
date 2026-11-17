@@ -142,7 +142,7 @@ const noInput = {
 
 export async function registerDiscoveryTools(
   ctx: DiscoveryToolsContext,
-  refresh: () => Promise<RefreshResult>,
+  refresh: (force?: boolean) => Promise<RefreshResult>,
   status: DiscoveryStatusReporter,
 ): Promise<void> {
   await ctx.tool.transform((tools) => {
@@ -152,7 +152,7 @@ export async function registerDiscoveryTools(
       input: noInput,
       execute: async () => {
         try {
-          const result = await refresh()
+          const result = await refresh(true)
           return { content: formatRefreshResult(result) }
         } catch (error) {
           return { content: formatRefreshFailure(error) }

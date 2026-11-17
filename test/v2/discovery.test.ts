@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { discoverInventory } from "../../src/v2/discovery.js"
 import { parseProviderDiscoveryOptions } from "../../src/v2/provider-config.js"
+import { createDiscoveryCacheEntry } from "../../src/core/discovery-cache.js"
 
 const options = new Map([["local", parseProviderDiscoveryOptions({
   enabled: true,
@@ -225,5 +226,94 @@ describe("V2 provider discovery", () => {
         error: "fetch failed: connection refused",
       }),
     )
+  })
+
+  it("falls back to an expired cache entry when the refresh request fails", async () => {
+    const logger = { warn: vi.fn() }
+    const stale = createDiscoveryCacheEntry({
+      providerID: "local",
+      baseURL: "http://127.0.0.1:1234/v1",
+      endpoint: "/v1/models",
+    }, [{ id: "qwen-stale" }], {}, new Date(Date.now() - 86_400_000).toISOString())
+    const storage = {
+      get: vi.fn(async () => stale),
+      set: vi.fn(async () => {}),
+    }
+    const fetcher = vi.fn().mockRejectedValue(new Error("fetch failed"))
+
+    const inventory = await discoverInventory([{
+      id: "local",
+      package: "@opencode/ai/providers/openai-compatible",
+      settings: { baseURL: "http://127.0.0.1:1234/v1" },
+    }], new Map([
+      ["local", parseProviderDiscoveryOptions({ enabled: true, cache: { enabled: true, ttlSeconds: 60 } })!],
+    ]), fetcher, storage, { logger })
+
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(inventory.get("local")?.get("qwen-stale")?.modelID).toBe("qwen-stale")
+    expect(storage.set).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Model discovery falling back to cached models for provider "local"',
+      expect.objectContaining({
+        provider: "local",
+        reason: "fetch failed",
+        fetchedAt: stale.fetchedAt,
+      }),
+    )
+  })
+
+  it("falls back to the cached model list when the models endpoint returns an error status", async () => {
+    const logger = { warn: vi.fn() }
+    const stale = createDiscoveryCacheEntry({
+      providerID: "local",
+      baseURL: "http://127.0.0.1:1234/v1",
+      endpoint: "/v1/models",
+    }, [{ id: "qwen-stale" }], {}, new Date(Date.now() - 86_400_000).toISOString())
+    const storage = {
+      get: vi.fn(async () => stale),
+      set: vi.fn(async () => {}),
+    }
+    const fetcher = vi.fn().mockResolvedValue({ ok: false, status: 503, statusText: "Service Unavailable" })
+
+    const inventory = await discoverInventory([{
+      id: "local",
+      package: "@opencode/ai/providers/openai-compatible",
+      settings: { baseURL: "http://127.0.0.1:1234/v1" },
+    }], new Map([
+      ["local", parseProviderDiscoveryOptions({ enabled: true, cache: { enabled: true, ttlSeconds: 60 } })!],
+    ]), fetcher, storage, { logger })
+
+    expect(inventory.get("local")?.has("qwen-stale")).toBe(true)
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Model discovery request failed for provider "local"',
+      expect.objectContaining({ status: 503 }),
+    )
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Model discovery falling back to cached models for provider "local"',
+      expect.objectContaining({ reason: "request failed with status 503" }),
+    )
+  })
+
+  it("does not serve stale models when the cache entry belongs to another endpoint", async () => {
+    const stale = createDiscoveryCacheEntry({
+      providerID: "local",
+      baseURL: "http://127.0.0.1:1234/v1",
+      endpoint: "/models",
+    }, [{ id: "qwen-stale" }], {})
+    const storage = {
+      get: vi.fn(async () => stale),
+      set: vi.fn(async () => {}),
+    }
+    const fetcher = vi.fn().mockRejectedValue(new Error("fetch failed"))
+
+    const inventory = await discoverInventory([{
+      id: "local",
+      package: "@opencode/ai/providers/openai-compatible",
+      settings: { baseURL: "http://127.0.0.1:1234/v1" },
+    }], new Map([
+      ["local", parseProviderDiscoveryOptions({ enabled: true, cache: { enabled: true, ttlSeconds: 60 } })!],
+    ]), fetcher, storage)
+
+    expect(inventory.has("local")).toBe(false)
   })
 })

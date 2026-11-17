@@ -4,7 +4,9 @@ import {
   discoveryCacheKey,
   isDiscoveryCacheFresh,
   parseDiscoveryCacheEntry,
+  parseStaleDiscoveryCacheEntry,
   readDiscoveryCache,
+  readStaleDiscoveryCache,
   writeDiscoveryCache,
 } from '../../src/core/discovery-cache'
 
@@ -38,5 +40,24 @@ describe('shared discovery cache policy', () => {
     }
     expect(await readDiscoveryCache(backend, 'key', identity, 60)).toBeUndefined()
     expect(await writeDiscoveryCache(backend, 'key', createDiscoveryCacheEntry(identity, [], {}))).toBe(false)
+  })
+
+  it('exposes expired entries only through the stale reader', async () => {
+    const now = Date.parse('2026-10-09T00:00:00.000Z')
+    const entry = createDiscoveryCacheEntry(identity, [{ id: 'qwen' }], {}, new Date(now - 60_000).toISOString())
+    const backend = { get: vi.fn().mockResolvedValue(entry), set: vi.fn() }
+
+    expect(parseDiscoveryCacheEntry(entry, identity, 1, now)).toBeUndefined()
+    expect(parseStaleDiscoveryCacheEntry(entry, identity)).toEqual(entry)
+    expect(await readDiscoveryCache(backend, 'key', identity, 1)).toBeUndefined()
+    expect(await readStaleDiscoveryCache(backend, 'key', identity)).toEqual(entry)
+  })
+
+  it('rejects stale entries whose identity no longer matches', async () => {
+    const entry = createDiscoveryCacheEntry(identity, [{ id: 'qwen' }], {})
+    const backend = { get: vi.fn().mockResolvedValue(entry), set: vi.fn() }
+
+    expect(parseStaleDiscoveryCacheEntry(entry, { ...identity, baseURL: 'http://127.0.0.1:9999/v1' })).toBeUndefined()
+    expect(await readStaleDiscoveryCache(backend, 'key', { ...identity, providerID: 'other' })).toBeUndefined()
   })
 })

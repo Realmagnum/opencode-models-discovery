@@ -29,8 +29,25 @@ export interface RpcStatusOutput {
     readonly id: string
     readonly name: string
     readonly modelCount: number
+    readonly enabled: boolean
     readonly models: readonly { readonly id: string; readonly name: string; readonly detail: string; readonly override?: RpcModelOverride; readonly defaultValues?: RpcModelValues }[]
   }[]
+}
+
+export interface RpcProviderState {
+  readonly id: string
+  readonly name: string
+  readonly enabled: boolean
+  readonly modelCount: number
+}
+
+export interface RpcProviderListOutput {
+  readonly providers: readonly RpcProviderState[]
+}
+
+export interface RpcProviderSetEnabledInput {
+  readonly providerID: string
+  readonly enabled: boolean
 }
 
 export interface RpcCacheEntry {
@@ -118,6 +135,7 @@ export const DiscoveryRpcDefinition = Rpc.define({
                 id: { type: "string" },
                 name: { type: "string" },
                 modelCount: { type: "number" },
+                enabled: { type: "boolean" },
                 models: {
                   type: "array",
                   items: {
@@ -133,7 +151,7 @@ export const DiscoveryRpcDefinition = Rpc.define({
                   },
                 },
               },
-              required: ["id", "name", "modelCount", "models"],
+              required: ["id", "name", "modelCount", "enabled", "models"],
             },
           },
         },
@@ -272,6 +290,60 @@ export const DiscoveryRpcDefinition = Rpc.define({
           success: { type: "boolean" },
         },
         required: ["success"],
+      },
+    },
+    providerList: {
+      input: {
+        type: "object",
+        properties: {},
+      },
+      output: {
+        type: "object",
+        properties: {
+          providers: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                enabled: { type: "boolean" },
+                modelCount: { type: "number" },
+              },
+              required: ["id", "name", "enabled", "modelCount"],
+            },
+          },
+        },
+        required: ["providers"],
+      },
+    },
+    providerSetEnabled: {
+      input: {
+        type: "object",
+        properties: {
+          providerID: { type: "string" },
+          enabled: { type: "boolean" },
+        },
+        required: ["providerID", "enabled"],
+      },
+      output: {
+        type: "object",
+        properties: {
+          providers: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                enabled: { type: "boolean" },
+                modelCount: { type: "number" },
+              },
+              required: ["id", "name", "enabled", "modelCount"],
+            },
+          },
+        },
+        required: ["providers"],
       },
     },
   },
