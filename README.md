@@ -85,9 +85,12 @@ The settings page lives under **Settings → Model Discovery** and adds:
 Install the plugin as a package so updates are atomic and the in-place update button works:
 
 ```sh
-opencode plugin add @realmagnum/opencode-models-discovery@2.2.0
+opencode plugin add @realmagnum/opencode-models-discovery@latest
 opencode plugin list
 ```
+
+Keep the target unpinned (`@latest`, a range, or a branch): `plugin update` skips exact package versions, so a pin
+disables in-place updates. Pin only when you want to freeze the version deliberately.
 
 Remove local copies first: a directory under `~/.config/opencode/plugins/opencode-models-discovery` is discovered
 automatically and would load twice. Keep local directories only for development, and point `plugins` at the checkout
