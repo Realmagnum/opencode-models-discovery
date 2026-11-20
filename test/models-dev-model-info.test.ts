@@ -21,6 +21,18 @@ describe('models.dev model enricher', () => {
     expect(result.limit).toEqual({ context: 1_000_000, output: 384_000 })
   })
 
+  it('keeps cpamp deepseek at 1M when the catalog has no entry for the gateway prefix', () => {
+    const enricher = createModelsDevEnricher(new Map())
+
+    const result = enricher.enrich({
+      id: 'opencode-go/deepseek-v4.1-flash',
+      context_length: 1_000_000,
+      max_completion_tokens: 384_000,
+    }, { filterNonChat: true })
+
+    expect(result.limit).toEqual({ context: 1_000_000, output: 384_000 })
+  })
+
   it('accepts max_context_length and max_output_tokens aliases', () => {
     const enricher = createModelsDevEnricher(catalog('custom-model', {
       context: 1_000_000,
