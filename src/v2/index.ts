@@ -171,7 +171,7 @@ export async function setupV2(ctx: Plugin.Context): Promise<() => void> {
   const providerStates = async (): Promise<RpcProviderState[]> => {
     const inventory = controller.getInventory()
     const listInput = ctx.location ? { location: ctx.location } : undefined
-    let registry: RegistryProvider[] = []
+    let registry: RegistryProvider[]
     try {
       registry = providerRecords(await ctx.provider.list(listInput as never))
     } catch {
